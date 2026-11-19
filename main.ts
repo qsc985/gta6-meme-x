@@ -25,7 +25,19 @@ try {
   if (typeof parsed !== 'object' || parsed === null || typeof (parsed as { url?: unknown }).url !== 'string') {
     throw new Error('POST.json must be a JSON object with a string "url" field');
   }
+  // The url must name a real X post, or the house cannot read it: either
+  // https://x.com/<handle>/status/<digits> or the same on twitter.com.
+  const url = (parsed as { url: string }).url;
+  if (!/^https:\/\/(x|twitter)\.com\/[^/]+\/status\/\d+$/.test(url)) {
+    throw new Error(`POST.json "url" must look like https://x.com/<handle>/status/<id>, got: ${url}`);
+  }
   copyFileSync(join(BOT_DIR, 'POST.json'), join(OUTPUT_DIR, 'POST.json'));
+  // Read the copy back and check it byte-for-byte against the source, so a
+  // half-written or truncated output is caught instead of handed to the gate.
+  const copied = readFileSync(join(OUTPUT_DIR, 'POST.json'));
+  if (!copied.equals(Buffer.from(raw, 'utf8'))) {
+    throw new Error('copied POST.json does not match the source byte-for-byte');
+  }
 } catch (err) {
   console.error(`POST.json could not be copied from ${BOT_DIR}: ${(err as Error).message}`);
   process.exit(1);
